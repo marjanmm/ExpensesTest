@@ -1,0 +1,528 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Expense Tracker</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: #f0f2f5;
+      color: #1a1a2e;
+      min-height: 100vh;
+    }
+
+    /* ── Login screen ─────────────────────────────────────── */
+    #loginScreen {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: #f0f2f5;
+      z-index: 100;
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+      gap: 24px;
+    }
+    #loginScreen.visible { display: flex; }
+
+    .login-box {
+      background: #fff;
+      border-radius: 16px;
+      padding: 48px 40px;
+      box-shadow: 0 4px 24px rgba(0,0,0,0.10);
+      text-align: center;
+      max-width: 360px;
+      width: 90%;
+    }
+    .login-box h1 { font-size: 1.6rem; margin-bottom: 8px; }
+    .login-box p  { color: #888; font-size: 0.9rem; margin-bottom: 32px; }
+
+    .btn-google {
+      display: inline-flex;
+      align-items: center;
+      gap: 12px;
+      padding: 12px 24px;
+      background: #fff;
+      border: 1.5px solid #ddd;
+      border-radius: 8px;
+      font-size: 0.95rem;
+      font-weight: 500;
+      cursor: pointer;
+      text-decoration: none;
+      color: #333;
+      transition: background 0.15s, box-shadow 0.15s;
+    }
+    .btn-google:hover { background: #f8f8f8; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
+    .btn-google svg { width: 20px; height: 20px; flex-shrink: 0; }
+
+    /* ── Main app ─────────────────────────────────────────── */
+    #app { display: none; }
+    #app.visible { display: block; }
+
+    /* Header */
+    .header {
+      background: #fff;
+      border-bottom: 1px solid #eee;
+      padding: 12px 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .header h1 { font-size: 1.1rem; font-weight: 700; }
+    .user-info  { display: flex; align-items: center; gap: 10px; }
+    .user-info img {
+      width: 32px; height: 32px;
+      border-radius: 50%;
+      object-fit: cover;
+      background: #eee;
+    }
+    .user-name  { font-size: 0.85rem; font-weight: 500; }
+    .btn-logout {
+      font-size: 0.8rem;
+      padding: 5px 12px;
+      border: 1.5px solid #ddd;
+      border-radius: 6px;
+      background: #fff;
+      cursor: pointer;
+      color: #555;
+      text-decoration: none;
+    }
+    .btn-logout:hover { background: #f5f5f5; }
+
+    /* Layout */
+    .container {
+      max-width: 760px;
+      margin: 0 auto;
+      padding: 24px 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    /* Summary cards */
+    .summary { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; }
+
+    .card {
+      background: #fff;
+      border-radius: 12px;
+      padding: 16px 20px;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+    }
+    .card .label {
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: #888;
+      margin-bottom: 6px;
+    }
+    .card .amount { font-size: 1.3rem; font-weight: 700; line-height: 1.4; }
+    .card .amount .currency-line { display: block; }
+    .card.total .amount { color: #e63946; }
+    .card.month .amount { color: #457b9d; }
+    .card.count .amount { font-size: 1.5rem; color: #2a9d8f; }
+
+    /* Form */
+    .form-card {
+      background: #fff; border-radius: 12px;
+      padding: 20px;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+    }
+    .form-card h2 { font-size: 1rem; font-weight: 600; margin-bottom: 16px; color: #444; }
+
+    .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .form-grid .full { grid-column: 1 / -1; }
+
+    label { display: block; font-size: 0.8rem; font-weight: 500; color: #555; margin-bottom: 4px; }
+
+    input, select, textarea {
+      width: 100%;
+      padding: 9px 12px;
+      border: 1.5px solid #ddd;
+      border-radius: 8px;
+      font-size: 0.9rem;
+      font-family: inherit;
+      background: #fafafa;
+      transition: border-color 0.2s;
+      outline: none;
+    }
+    input:focus, select:focus, textarea:focus { border-color: #457b9d; background: #fff; }
+
+    .btn {
+      padding: 10px 20px;
+      border: none;
+      border-radius: 8px;
+      font-size: 0.9rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: opacity 0.15s, transform 0.1s;
+    }
+    .btn:active  { transform: scale(0.97); }
+    .btn:hover   { opacity: 0.88; }
+    .btn-primary { background: #457b9d; color: #fff; }
+    .btn-danger  { background: #e63946; color: #fff; padding: 6px 12px; font-size: 0.8rem; }
+    .btn-sm      { padding: 5px 10px; font-size: 0.78rem; }
+
+    /* Filters */
+    .filters { display: flex; gap: 10px; flex-wrap: wrap; align-items: flex-end; }
+    .filters > div { flex: 1; min-width: 140px; }
+
+    /* List */
+    .list-card {
+      background: #fff;
+      border-radius: 12px;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+      overflow: hidden;
+    }
+    .list-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 16px 20px;
+      border-bottom: 1px solid #f0f0f0;
+    }
+    .list-header h2 { font-size: 1rem; font-weight: 600; color: #444; }
+
+    .expense-list { list-style: none; }
+
+    .expense-item {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 14px 20px;
+      border-bottom: 1px solid #f5f5f5;
+      transition: background 0.15s;
+    }
+    .expense-item:last-child { border-bottom: none; }
+    .expense-item:hover { background: #fafafa; }
+
+    .category-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+    .expense-info { flex: 1; min-width: 0; }
+    .expense-desc { font-size: 0.9rem; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .expense-meta { font-size: 0.75rem; color: #999; margin-top: 2px; }
+    .expense-amount { font-size: 1rem; font-weight: 700; color: #e63946; white-space: nowrap; }
+
+    .empty { text-align: center; padding: 40px 20px; color: #bbb; font-size: 0.9rem; }
+
+    /* Category colors */
+    .cat-food          { background: #f4a261; }
+    .cat-transport     { background: #457b9d; }
+    .cat-housing       { background: #2a9d8f; }
+    .cat-health        { background: #e63946; }
+    .cat-shopping      { background: #a8dadc; }
+    .cat-entertainment { background: #9b5de5; }
+    .cat-utilities     { background: #f3722c; }
+    .cat-other         { background: #aaa; }
+
+    @media (max-width: 480px) {
+      .form-grid { grid-template-columns: 1fr; }
+      .form-grid .full { grid-column: 1; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Login screen -->
+  <div id="loginScreen">
+    <div class="login-box">
+      <h1>Expense Tracker</h1>
+      <p>Sign in to track and access your expenses from any device.</p>
+      <a href="/auth/google" class="btn-google">
+        <!-- Google logo -->
+        <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+          <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
+          <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
+          <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z" fill="#FBBC05"/>
+          <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
+        </svg>
+        Sign in with Google
+      </a>
+    </div>
+  </div>
+
+  <!-- Main app -->
+  <div id="app">
+    <div class="header">
+      <h1>Expense Tracker</h1>
+      <div class="user-info">
+        <img id="userAvatar" src="" alt="" onerror="this.style.display='none'" />
+        <span class="user-name" id="userName"></span>
+        <a href="/auth/logout" class="btn-logout">Sign out</a>
+      </div>
+    </div>
+
+    <div class="container">
+
+      <!-- Summary -->
+      <div class="summary">
+        <div class="card total">
+          <div class="label">Total Spent</div>
+          <div class="amount" id="totalAll">—</div>
+        </div>
+        <div class="card month">
+          <div class="label">This Month</div>
+          <div class="amount" id="totalMonth">—</div>
+        </div>
+        <div class="card count">
+          <div class="label">Entries</div>
+          <div class="amount" id="totalCount">0</div>
+        </div>
+      </div>
+
+      <!-- Add Expense Form -->
+      <div class="form-card">
+        <h2>Add Expense</h2>
+        <form id="expenseForm">
+          <div class="form-grid">
+            <div>
+              <label for="amount">Amount</label>
+              <input type="number" id="amount" placeholder="0.00" min="0.01" step="0.01" required />
+            </div>
+            <div>
+              <label for="currency">Currency</label>
+              <select id="currency" required>
+                <option value="RSD">RSD – Serbian Dinar</option>
+                <option value="EUR">EUR – Euro</option>
+                <option value="USD">USD – US Dollar</option>
+                <option value="CHF">CHF – Swiss Franc</option>
+                <option value="GBP">GBP – British Pound</option>
+              </select>
+            </div>
+            <div>
+              <label for="date">Date</label>
+              <input type="date" id="date" required />
+            </div>
+            <div>
+              <label for="category">Category</label>
+              <select id="category" required>
+                <option value="">Select category</option>
+                <option value="food">Food &amp; Dining</option>
+                <option value="transport">Transport</option>
+                <option value="housing">Housing</option>
+                <option value="health">Health</option>
+                <option value="shopping">Shopping</option>
+                <option value="entertainment">Entertainment</option>
+                <option value="utilities">Utilities</option>
+                <option value="other">Other</option>
+              </select>
+            </div>
+            <div class="full">
+              <label for="description">Description</label>
+              <input type="text" id="description" placeholder="e.g. Groceries" required />
+            </div>
+            <div class="full" style="text-align:right">
+              <button type="submit" class="btn btn-primary">+ Add Expense</button>
+            </div>
+          </div>
+        </form>
+      </div>
+
+      <!-- Filters -->
+      <div class="filters">
+        <div>
+          <label for="filterCurrency">Filter by Currency</label>
+          <select id="filterCurrency">
+            <option value="">All Currencies</option>
+            <option value="RSD">RSD</option>
+            <option value="EUR">EUR</option>
+            <option value="USD">USD</option>
+            <option value="CHF">CHF</option>
+            <option value="GBP">GBP</option>
+          </select>
+        </div>
+        <div>
+          <label for="filterCategory">Filter by Category</label>
+          <select id="filterCategory">
+            <option value="">All Categories</option>
+            <option value="food">Food &amp; Dining</option>
+            <option value="transport">Transport</option>
+            <option value="housing">Housing</option>
+            <option value="health">Health</option>
+            <option value="shopping">Shopping</option>
+            <option value="entertainment">Entertainment</option>
+            <option value="utilities">Utilities</option>
+            <option value="other">Other</option>
+          </select>
+        </div>
+        <div>
+          <label for="filterMonth">Filter by Month</label>
+          <input type="month" id="filterMonth" />
+        </div>
+        <div style="flex:0">
+          <label>&nbsp;</label>
+          <button class="btn btn-sm" onclick="clearFilters()" style="background:#eee;color:#555">Clear</button>
+        </div>
+      </div>
+
+      <!-- Expense List -->
+      <div class="list-card">
+        <div class="list-header">
+          <h2>Expenses</h2>
+          <button class="btn btn-danger btn-sm" onclick="clearAll()">Clear All</button>
+        </div>
+        <ul class="expense-list" id="expenseList"></ul>
+      </div>
+
+    </div>
+  </div>
+
+  <script>
+    const API = "/api/expenses";
+
+    const CATEGORY_LABELS = {
+      food: "Food & Dining", transport: "Transport", housing: "Housing",
+      health: "Health", shopping: "Shopping", entertainment: "Entertainment",
+      utilities: "Utilities", other: "Other"
+    };
+
+    const CURRENCY_FMT = {
+      RSD: (n) => Number(n).toLocaleString("sr-RS", { maximumFractionDigits: 0 }) + " RSD",
+      EUR: (n) => "€" + Number(n).toFixed(2),
+      USD: (n) => "$" + Number(n).toFixed(2),
+      CHF: (n) => "CHF " + Number(n).toFixed(2),
+      GBP: (n) => "£" + Number(n).toFixed(2),
+    };
+
+    function formatMoney(amount, currency) {
+      return (CURRENCY_FMT[currency] || CURRENCY_FMT.RSD)(amount);
+    }
+
+    function formatDate(dateStr) {
+      const [y, m, d] = dateStr.split("-");
+      return new Date(y, m - 1, d).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+    }
+
+    function escHtml(str) {
+      return str.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+    }
+
+    let expenses = [];
+
+    function render() {
+      const catFilter      = document.getElementById("filterCategory").value;
+      const monthFilter    = document.getElementById("filterMonth").value;
+      const currencyFilter = document.getElementById("filterCurrency").value;
+
+      const filtered = expenses.filter(e => {
+        if (catFilter      && e.category !== catFilter)        return false;
+        if (monthFilter    && !e.date.startsWith(monthFilter)) return false;
+        if (currencyFilter && e.currency !== currencyFilter)   return false;
+        return true;
+      });
+
+      // Summary — group totals by currency
+      const now = new Date();
+      const thisMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+
+      function totalsHTML(list) {
+        const totals = {};
+        list.forEach(e => { totals[e.currency] = (totals[e.currency] || 0) + parseFloat(e.amount); });
+        const keys = Object.keys(totals);
+        if (keys.length === 0) return "—";
+        return keys.map(c => `<span class="currency-line">${formatMoney(totals[c], c)}</span>`).join("");
+      }
+
+      document.getElementById("totalAll").innerHTML   = totalsHTML(expenses);
+      document.getElementById("totalMonth").innerHTML = totalsHTML(expenses.filter(e => e.date.startsWith(thisMonth)));
+      document.getElementById("totalCount").textContent = expenses.length;
+
+      // List
+      const list = document.getElementById("expenseList");
+      if (filtered.length === 0) {
+        list.innerHTML = `<li class="empty">No expenses yet. Add one above!</li>`;
+        return;
+      }
+
+      list.innerHTML = filtered.map(e => `
+        <li class="expense-item">
+          <span class="category-dot cat-${e.category}"></span>
+          <div class="expense-info">
+            <div class="expense-desc">${escHtml(e.description)}</div>
+            <div class="expense-meta">${CATEGORY_LABELS[e.category]} &middot; ${formatDate(e.date)}</div>
+          </div>
+          <span class="expense-amount">${formatMoney(e.amount, e.currency)}</span>
+          <button class="btn btn-danger btn-sm" onclick="deleteExpense('${e.id}')">Delete</button>
+        </li>
+      `).join("");
+    }
+
+    async function loadExpenses() {
+      const res = await fetch(API);
+      if (!res.ok) return;
+      expenses = await res.json();
+      render();
+    }
+
+    document.getElementById("expenseForm").addEventListener("submit", async e => {
+      e.preventDefault();
+      const amount      = parseFloat(document.getElementById("amount").value);
+      const currency    = document.getElementById("currency").value;
+      const date        = document.getElementById("date").value;
+      const category    = document.getElementById("category").value;
+      const description = document.getElementById("description").value.trim();
+
+      if (!amount || !currency || !date || !category || !description) return;
+
+      const res = await fetch(API, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ amount, currency, date, category, description }),
+      });
+
+      if (res.ok) {
+        const newExpense = await res.json();
+        expenses.unshift(newExpense);
+        render();
+        document.getElementById("amount").value = "";
+        document.getElementById("description").value = "";
+        document.getElementById("category").value = "";
+      }
+    });
+
+    async function deleteExpense(id) {
+      await fetch(`${API}/${id}`, { method: "DELETE" });
+      expenses = expenses.filter(e => e.id !== id);
+      render();
+    }
+
+    async function clearAll() {
+      if (confirm("Delete all expenses? This cannot be undone.")) {
+        await fetch(API, { method: "DELETE" });
+        expenses = [];
+        render();
+      }
+    }
+
+    function clearFilters() {
+      document.getElementById("filterCategory").value = "";
+      document.getElementById("filterMonth").value    = "";
+      document.getElementById("filterCurrency").value = "";
+      render();
+    }
+
+    document.getElementById("filterCategory").addEventListener("change", render);
+    document.getElementById("filterMonth").addEventListener("change", render);
+    document.getElementById("filterCurrency").addEventListener("change", render);
+
+    // ── Auth ──────────────────────────────────────────────────────────────────
+    async function init() {
+      document.getElementById("date").value = new Date().toISOString().split("T")[0];
+
+      const res = await fetch("/auth/me");
+      if (res.ok) {
+        const user = await res.json();
+        document.getElementById("userName").textContent = user.name;
+        document.getElementById("userAvatar").src = user.avatar || "";
+        document.getElementById("app").classList.add("visible");
+        await loadExpenses();
+      } else {
+        document.getElementById("loginScreen").classList.add("visible");
+      }
+    }
+
+    init();
+  </script>
+</body>
+</html>
