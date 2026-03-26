@@ -326,8 +326,12 @@
 
     // ── Date helpers ──────────────────────────────────────────────────────────
 
+    function toDateStr(d) {
+      return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
+    }
+
     function today() {
-      return new Date().toISOString().split("T")[0];
+      return toDateStr(new Date());
     }
 
     function monthStart() {
@@ -347,7 +351,7 @@
     function addDays(dateStr, n) {
       const d = parseDate(dateStr);
       d.setDate(d.getDate() + n);
-      return d.toISOString().split("T")[0];
+      return toDateStr(d);
     }
 
     function getGranularity(fromStr, toStr) {
@@ -363,7 +367,7 @@
       const day = d.getDay(); // 0=Sun
       const diff = day === 0 ? -6 : 1 - day;
       d.setDate(d.getDate() + diff);
-      return d.toISOString().split("T")[0];
+      return toDateStr(d);
     }
 
     function monthKey(dateStr) {
