@@ -70,8 +70,23 @@
       display: flex;
       align-items: center;
       justify-content: space-between;
+      gap: 16px;
     }
-    .header h1 { font-size: 1.1rem; font-weight: 700; }
+    .header-left { display: flex; align-items: center; gap: 20px; }
+    .header h1 { font-size: 1.1rem; font-weight: 700; white-space: nowrap; }
+
+    .nav { display: flex; gap: 4px; }
+    .nav a {
+      font-size: 0.85rem;
+      font-weight: 500;
+      padding: 5px 12px;
+      border-radius: 6px;
+      text-decoration: none;
+      color: #555;
+      transition: background 0.15s;
+    }
+    .nav a:hover { background: #f0f2f5; }
+    .nav a.active { background: #457b9d; color: #fff; }
     .user-info  { display: flex; align-items: center; gap: 10px; }
     .user-info img {
       width: 32px; height: 32px;
@@ -245,7 +260,13 @@
   <!-- Main app -->
   <div id="app">
     <div class="header">
-      <h1>Expense Tracker</h1>
+      <div class="header-left">
+        <h1>Expense Tracker</h1>
+        <nav class="nav">
+          <a href="/expenses.html" class="active">Expenses</a>
+          <a href="/reports.html">Reports</a>
+        </nav>
+      </div>
       <div class="user-info">
         <img id="userAvatar" src="" alt="" onerror="this.style.display='none'" />
         <span class="user-name" id="userName"></span>

@@ -1,0 +1,615 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Reports – Expense Tracker</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: #f0f2f5;
+      color: #1a1a2e;
+      min-height: 100vh;
+    }
+
+    /* ── Login screen ─────────────────────────────────────── */
+    #loginScreen {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: #f0f2f5;
+      z-index: 100;
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+      gap: 24px;
+    }
+    #loginScreen.visible { display: flex; }
+
+    .login-box {
+      background: #fff;
+      border-radius: 16px;
+      padding: 48px 40px;
+      box-shadow: 0 4px 24px rgba(0,0,0,0.10);
+      text-align: center;
+      max-width: 360px;
+      width: 90%;
+    }
+    .login-box h1 { font-size: 1.6rem; margin-bottom: 8px; }
+    .login-box p  { color: #888; font-size: 0.9rem; margin-bottom: 32px; }
+
+    .btn-google {
+      display: inline-flex;
+      align-items: center;
+      gap: 12px;
+      padding: 12px 24px;
+      background: #fff;
+      border: 1.5px solid #ddd;
+      border-radius: 8px;
+      font-size: 0.95rem;
+      font-weight: 500;
+      cursor: pointer;
+      text-decoration: none;
+      color: #333;
+      transition: background 0.15s, box-shadow 0.15s;
+    }
+    .btn-google:hover { background: #f8f8f8; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
+    .btn-google svg { width: 20px; height: 20px; flex-shrink: 0; }
+
+    /* ── Main app ─────────────────────────────────────────── */
+    #app { display: none; }
+    #app.visible { display: block; }
+
+    /* Header */
+    .header {
+      background: #fff;
+      border-bottom: 1px solid #eee;
+      padding: 12px 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+    }
+    .header-left { display: flex; align-items: center; gap: 20px; }
+    .header h1 { font-size: 1.1rem; font-weight: 700; white-space: nowrap; }
+
+    .nav { display: flex; gap: 4px; }
+    .nav a {
+      font-size: 0.85rem;
+      font-weight: 500;
+      padding: 5px 12px;
+      border-radius: 6px;
+      text-decoration: none;
+      color: #555;
+      transition: background 0.15s;
+    }
+    .nav a:hover { background: #f0f2f5; }
+    .nav a.active { background: #457b9d; color: #fff; }
+
+    .user-info  { display: flex; align-items: center; gap: 10px; }
+    .user-info img {
+      width: 32px; height: 32px;
+      border-radius: 50%;
+      object-fit: cover;
+      background: #eee;
+    }
+    .user-name  { font-size: 0.85rem; font-weight: 500; }
+    .btn-logout {
+      font-size: 0.8rem;
+      padding: 5px 12px;
+      border: 1.5px solid #ddd;
+      border-radius: 6px;
+      background: #fff;
+      cursor: pointer;
+      color: #555;
+      text-decoration: none;
+    }
+    .btn-logout:hover { background: #f5f5f5; }
+
+    /* Layout */
+    .container {
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 24px 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    /* Controls */
+    .controls {
+      background: #fff;
+      border-radius: 12px;
+      padding: 16px 20px;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+      align-items: flex-end;
+    }
+    .controls > div { flex: 1; min-width: 140px; }
+
+    label { display: block; font-size: 0.8rem; font-weight: 500; color: #555; margin-bottom: 4px; }
+
+    input, select {
+      width: 100%;
+      padding: 9px 12px;
+      border: 1.5px solid #ddd;
+      border-radius: 8px;
+      font-size: 0.9rem;
+      font-family: inherit;
+      background: #fafafa;
+      transition: border-color 0.2s;
+      outline: none;
+    }
+    input:focus, select:focus { border-color: #457b9d; background: #fff; }
+
+    /* Summary cards */
+    .summary { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; }
+    .card {
+      background: #fff;
+      border-radius: 12px;
+      padding: 16px 20px;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+    }
+    .card .label {
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: #888;
+      margin-bottom: 6px;
+    }
+    .card .amount { font-size: 1.3rem; font-weight: 700; line-height: 1.4; }
+    .card .amount .currency-line { display: block; }
+    .card.total .amount  { color: #e63946; }
+    .card.count .amount  { font-size: 1.5rem; color: #2a9d8f; }
+    .card.gran  .amount  { font-size: 1rem; color: #457b9d; font-weight: 600; }
+
+    /* Chart cards */
+    .chart-card {
+      background: #fff;
+      border-radius: 12px;
+      padding: 20px;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+    }
+    .chart-card h2 {
+      font-size: 1rem;
+      font-weight: 600;
+      color: #444;
+      margin-bottom: 16px;
+    }
+    .chart-wrap {
+      position: relative;
+      width: 100%;
+    }
+    .chart-wrap.bar  { height: 280px; }
+    .chart-wrap.pie  { height: 320px; }
+
+    .empty-chart {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: 200px;
+      color: #bbb;
+      font-size: 0.9rem;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Login screen -->
+  <div id="loginScreen">
+    <div class="login-box">
+      <h1>Expense Tracker</h1>
+      <p>Sign in to view your reports.</p>
+      <a href="/auth/google" class="btn-google">
+        <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+          <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
+          <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
+          <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z" fill="#FBBC05"/>
+          <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
+        </svg>
+        Sign in with Google
+      </a>
+    </div>
+  </div>
+
+  <!-- Main app -->
+  <div id="app">
+    <div class="header">
+      <div class="header-left">
+        <h1>Expense Tracker</h1>
+        <nav class="nav">
+          <a href="/expenses.html">Expenses</a>
+          <a href="/reports.html" class="active">Reports</a>
+        </nav>
+      </div>
+      <div class="user-info">
+        <img id="userAvatar" src="" alt="" onerror="this.style.display='none'" />
+        <span class="user-name" id="userName"></span>
+        <a href="/auth/logout" class="btn-logout">Sign out</a>
+      </div>
+    </div>
+
+    <div class="container">
+
+      <!-- Controls -->
+      <div class="controls">
+        <div>
+          <label for="dateFrom">From</label>
+          <input type="date" id="dateFrom" />
+        </div>
+        <div>
+          <label for="dateTo">To</label>
+          <input type="date" id="dateTo" />
+        </div>
+        <div>
+          <label for="filterCurrency">Currency</label>
+          <select id="filterCurrency">
+            <option value="">All Currencies</option>
+            <option value="RSD">RSD</option>
+            <option value="EUR">EUR</option>
+            <option value="USD">USD</option>
+            <option value="CHF">CHF</option>
+            <option value="GBP">GBP</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Summary -->
+      <div class="summary">
+        <div class="card total">
+          <div class="label">Total in Range</div>
+          <div class="amount" id="summaryTotal">—</div>
+        </div>
+        <div class="card count">
+          <div class="label">Transactions</div>
+          <div class="amount" id="summaryCount">0</div>
+        </div>
+        <div class="card gran">
+          <div class="label">Grouped by</div>
+          <div class="amount" id="summaryGran">—</div>
+        </div>
+      </div>
+
+      <!-- Timeline chart -->
+      <div class="chart-card">
+        <h2 id="timelineTitle">Spending Over Time</h2>
+        <div class="chart-wrap bar">
+          <canvas id="timelineChart"></canvas>
+        </div>
+      </div>
+
+      <!-- Category pie chart -->
+      <div class="chart-card">
+        <h2>Spending by Category</h2>
+        <div class="chart-wrap pie">
+          <canvas id="categoryChart"></canvas>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <script>
+    const CATEGORY_LABELS = {
+      food: "Food & Dining", transport: "Transport", housing: "Housing",
+      health: "Health", shopping: "Shopping", entertainment: "Entertainment",
+      utilities: "Utilities", other: "Other"
+    };
+
+    const CATEGORY_COLORS = {
+      food:          "#f4a261",
+      transport:     "#457b9d",
+      housing:       "#2a9d8f",
+      health:        "#e63946",
+      shopping:      "#a8dadc",
+      entertainment: "#9b5de5",
+      utilities:     "#f3722c",
+      other:         "#aaa",
+    };
+
+    const CURRENCY_FMT = {
+      RSD: (n) => Number(n).toLocaleString("sr-RS", { maximumFractionDigits: 0 }) + " RSD",
+      EUR: (n) => "€" + Number(n).toFixed(2),
+      USD: (n) => "$" + Number(n).toFixed(2),
+      CHF: (n) => "CHF " + Number(n).toFixed(2),
+      GBP: (n) => "£" + Number(n).toFixed(2),
+    };
+
+    function formatMoney(amount, currency) {
+      return (CURRENCY_FMT[currency] || ((n) => Number(n).toFixed(2) + " " + currency))(amount);
+    }
+
+    // ── Date helpers ──────────────────────────────────────────────────────────
+
+    function today() {
+      return new Date().toISOString().split("T")[0];
+    }
+
+    function monthStart() {
+      const now = new Date();
+      return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-01`;
+    }
+
+    function parseDate(str) {
+      const [y, m, d] = str.split("-").map(Number);
+      return new Date(y, m - 1, d);
+    }
+
+    function daysBetween(fromStr, toStr) {
+      return (parseDate(toStr) - parseDate(fromStr)) / 86400000;
+    }
+
+    function addDays(dateStr, n) {
+      const d = parseDate(dateStr);
+      d.setDate(d.getDate() + n);
+      return d.toISOString().split("T")[0];
+    }
+
+    function getGranularity(fromStr, toStr) {
+      const days = daysBetween(fromStr, toStr);
+      if (days <= 14)  return "day";
+      if (days <= 90)  return "week";
+      return "month";
+    }
+
+    // Returns the Monday of the week containing dateStr
+    function weekStart(dateStr) {
+      const d = parseDate(dateStr);
+      const day = d.getDay(); // 0=Sun
+      const diff = day === 0 ? -6 : 1 - day;
+      d.setDate(d.getDate() + diff);
+      return d.toISOString().split("T")[0];
+    }
+
+    function monthKey(dateStr) {
+      return dateStr.slice(0, 7); // "YYYY-MM"
+    }
+
+    function formatDayLabel(dateStr) {
+      const [y, m, d] = dateStr.split("-").map(Number);
+      return new Date(y, m - 1, d).toLocaleDateString("en-US", { month: "short", day: "numeric" });
+    }
+
+    function formatWeekLabel(mondayStr) {
+      return "W/o " + formatDayLabel(mondayStr);
+    }
+
+    function formatMonthLabel(ym) {
+      const [y, m] = ym.split("-").map(Number);
+      return new Date(y, m - 1, 1).toLocaleDateString("en-US", { month: "short", year: "numeric" });
+    }
+
+    // ── Bucketing ─────────────────────────────────────────────────────────────
+
+    function buildTimeline(expenses, fromStr, toStr, granularity) {
+      const buckets = new Map();
+
+      if (granularity === "day") {
+        let cur = fromStr;
+        while (cur <= toStr) { buckets.set(cur, 0); cur = addDays(cur, 1); }
+        expenses.forEach(e => {
+          if (e.date >= fromStr && e.date <= toStr && buckets.has(e.date))
+            buckets.set(e.date, buckets.get(e.date) + parseFloat(e.amount));
+        });
+        return {
+          labels: [...buckets.keys()].map(formatDayLabel),
+          data:   [...buckets.values()],
+        };
+      }
+
+      if (granularity === "week") {
+        // Enumerate week starts
+        let cur = weekStart(fromStr);
+        const toWeek = weekStart(toStr);
+        while (cur <= toWeek) { buckets.set(cur, 0); cur = addDays(cur, 7); }
+        expenses.forEach(e => {
+          if (e.date >= fromStr && e.date <= toStr) {
+            const wk = weekStart(e.date);
+            if (buckets.has(wk)) buckets.set(wk, buckets.get(wk) + parseFloat(e.amount));
+          }
+        });
+        return {
+          labels: [...buckets.keys()].map(formatWeekLabel),
+          data:   [...buckets.values()],
+        };
+      }
+
+      // month
+      {
+        let [fy, fm] = fromStr.slice(0, 7).split("-").map(Number);
+        const [ty, tm] = toStr.slice(0, 7).split("-").map(Number);
+        while (fy < ty || (fy === ty && fm <= tm)) {
+          const key = `${fy}-${String(fm).padStart(2, "0")}`;
+          buckets.set(key, 0);
+          fm++;
+          if (fm > 12) { fm = 1; fy++; }
+        }
+        expenses.forEach(e => {
+          if (e.date >= fromStr && e.date <= toStr) {
+            const mk = monthKey(e.date);
+            if (buckets.has(mk)) buckets.set(mk, buckets.get(mk) + parseFloat(e.amount));
+          }
+        });
+        return {
+          labels: [...buckets.keys()].map(formatMonthLabel),
+          data:   [...buckets.values()],
+        };
+      }
+    }
+
+    function buildCategoryData(expenses) {
+      const totals = {};
+      expenses.forEach(e => {
+        totals[e.category] = (totals[e.category] || 0) + parseFloat(e.amount);
+      });
+      const entries = Object.entries(totals).sort((a, b) => b[1] - a[1]);
+      return {
+        labels: entries.map(([k]) => CATEGORY_LABELS[k] || k),
+        data:   entries.map(([, v]) => v),
+        colors: entries.map(([k]) => CATEGORY_COLORS[k] || "#ccc"),
+      };
+    }
+
+    // ── Charts ────────────────────────────────────────────────────────────────
+
+    let timelineChart = null;
+    let categoryChart = null;
+
+    function renderCharts(expenses, fromStr, toStr, currency) {
+      const filtered = expenses.filter(e => {
+        if (e.date < fromStr || e.date > toStr) return false;
+        if (currency && e.currency !== currency) return false;
+        return true;
+      });
+
+      // Summary
+      const totals = {};
+      filtered.forEach(e => { totals[e.currency] = (totals[e.currency] || 0) + parseFloat(e.amount); });
+      const totalKeys = Object.keys(totals);
+      document.getElementById("summaryTotal").innerHTML =
+        totalKeys.length === 0
+          ? "—"
+          : totalKeys.map(c => `<span class="currency-line">${formatMoney(totals[c], c)}</span>`).join("");
+      document.getElementById("summaryCount").textContent = filtered.length;
+
+      const gran = getGranularity(fromStr, toStr);
+      const granLabel = gran === "day" ? "Day" : gran === "week" ? "Week" : "Month";
+      document.getElementById("summaryGran").textContent = granLabel;
+
+      const currencyLabel = currency || (totalKeys.length === 1 ? totalKeys[0] : "mixed");
+      document.getElementById("timelineTitle").textContent =
+        `Spending Over Time${currency ? " (" + currency + ")" : ""}`;
+
+      // Timeline
+      const timeline = buildTimeline(filtered, fromStr, toStr, gran);
+
+      if (timelineChart) timelineChart.destroy();
+      const tCtx = document.getElementById("timelineChart").getContext("2d");
+      timelineChart = new Chart(tCtx, {
+        type: "bar",
+        data: {
+          labels: timeline.labels,
+          datasets: [{
+            label: currencyLabel,
+            data: timeline.data,
+            backgroundColor: "rgba(69,123,157,0.7)",
+            borderColor: "#457b9d",
+            borderWidth: 1,
+            borderRadius: 4,
+          }],
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: { legend: { display: false } },
+          scales: {
+            y: {
+              beginAtZero: true,
+              ticks: {
+                callback: (v) => currency ? formatMoney(v, currency) : v.toLocaleString(),
+              },
+            },
+            x: {
+              ticks: { maxRotation: 45, minRotation: 0, font: { size: 11 } },
+            },
+          },
+        },
+      });
+
+      // Category pie
+      const catData = buildCategoryData(filtered);
+
+      if (categoryChart) categoryChart.destroy();
+      const cCtx = document.getElementById("categoryChart").getContext("2d");
+
+      if (catData.data.length === 0) {
+        categoryChart = null;
+        cCtx.clearRect(0, 0, cCtx.canvas.width, cCtx.canvas.height);
+        cCtx.canvas.parentElement.innerHTML =
+          `<div class="empty-chart">No expenses in this range.</div>`;
+        return;
+      }
+
+      categoryChart = new Chart(cCtx, {
+        type: "doughnut",
+        data: {
+          labels: catData.labels,
+          datasets: [{
+            data: catData.data,
+            backgroundColor: catData.colors,
+            borderWidth: 2,
+            borderColor: "#fff",
+          }],
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: {
+              position: "right",
+              labels: { font: { size: 12 }, padding: 16 },
+            },
+            tooltip: {
+              callbacks: {
+                label: (ctx) => {
+                  const val = ctx.parsed;
+                  const total = ctx.dataset.data.reduce((a, b) => a + b, 0);
+                  const pct = ((val / total) * 100).toFixed(1);
+                  const fmt = currency ? formatMoney(val, currency) : val.toLocaleString();
+                  return ` ${fmt} (${pct}%)`;
+                },
+              },
+            },
+          },
+        },
+      });
+    }
+
+    // ── State & events ────────────────────────────────────────────────────────
+
+    let allExpenses = [];
+
+    function refresh() {
+      const from     = document.getElementById("dateFrom").value;
+      const to       = document.getElementById("dateTo").value;
+      const currency = document.getElementById("filterCurrency").value;
+      if (from && to && from <= to) renderCharts(allExpenses, from, to, currency);
+    }
+
+    document.getElementById("dateFrom").addEventListener("change", refresh);
+    document.getElementById("dateTo").addEventListener("change", refresh);
+    document.getElementById("filterCurrency").addEventListener("change", refresh);
+
+    // ── Auth & init ───────────────────────────────────────────────────────────
+
+    async function init() {
+      // Default range: this month to today
+      document.getElementById("dateFrom").value = monthStart();
+      document.getElementById("dateTo").value   = today();
+
+      const res = await fetch("/auth/me");
+      if (res.ok) {
+        const user = await res.json();
+        document.getElementById("userName").textContent = user.name;
+        document.getElementById("userAvatar").src = user.avatar || "";
+        document.getElementById("app").classList.add("visible");
+
+        const expRes = await fetch("/api/expenses");
+        if (expRes.ok) {
+          allExpenses = await expRes.json();
+          refresh();
+        }
+      } else {
+        document.getElementById("loginScreen").classList.add("visible");
+      }
+    }
+
+    init();
+  </script>
+</body>
+</html>
