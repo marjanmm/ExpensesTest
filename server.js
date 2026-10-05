@@ -1,4 +1,5 @@
 require("dotenv").config();
+const path = require("path");
 const express = require("express");
 const cors = require("cors");
 const { Pool } = require("pg");
@@ -161,7 +162,7 @@ app.delete("/api/expenses", requireAuth, async (req, res) => {
 });
 
 // Static files last
-app.use(express.static(__dirname));
+app.use(express.static(path.join(__dirname, "public")));
 
 init().then(() => {
   app.listen(port, () => console.log(`Server running on ${BASE_URL}`));
