@@ -106,6 +106,7 @@
       cursor: pointer;
       color: #555;
       text-decoration: none;
+      font-family: inherit;
     }
     .btn-logout:hover { background: #f5f5f5; }
 
@@ -230,7 +231,7 @@
       <div class="user-info">
         <img id="userAvatar" src="" alt="" onerror="this.style.display='none'" />
         <span class="user-name" id="userName"></span>
-        <a href="/auth/logout" class="btn-logout">Sign out</a>
+        <form method="post" action="/auth/logout"><button type="submit" class="btn-logout">Sign out</button></form>
       </div>
     </div>
 
