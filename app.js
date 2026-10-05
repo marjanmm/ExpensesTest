@@ -4,7 +4,7 @@ const path = require("path");
 const express = require("express");
 const helmet = require("helmet");
 const rateLimit = require("express-rate-limit");
-const { Pool } = require("pg");
+const { Pool, types } = require("pg");
 const passport = require("passport");
 const GoogleStrategy = require("passport-google-oauth20").Strategy;
 const session = require("express-session");
@@ -40,6 +40,10 @@ function sslConfig() {
   if (!isProd || process.env.DATABASE_SSL === "false") return false;
   return { rejectUnauthorized: true, ...(process.env.DATABASE_SSL_CA && { ca: process.env.DATABASE_SSL_CA }) };
 }
+
+// Return DATE columns as plain "YYYY-MM-DD" strings. The default parser builds a Date at local
+// midnight, and converting that to UTC (toISOString) shifts the day back in timezones east of UTC.
+types.setTypeParser(types.builtins.DATE, value => value);
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
@@ -239,7 +243,7 @@ app.get("/api/expenses", requireAuth, wrap(async (req, res) => {
     "SELECT * FROM expenses WHERE user_id = $1 ORDER BY date DESC, created_at DESC",
     [req.user.id]
   );
-  res.json(rows.map(r => ({ ...r, date: r.date.toISOString().split("T")[0] })));
+  res.json(rows);
 }));
 
 app.post("/api/expenses", requireAuth, wrap(async (req, res) => {
@@ -251,8 +255,7 @@ app.post("/api/expenses", requireAuth, wrap(async (req, res) => {
      VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
     [req.user.id, value.amount, value.currency, value.date, value.category, value.description]
   );
-  const r = rows[0];
-  res.status(201).json({ ...r, date: r.date.toISOString().split("T")[0] });
+  res.status(201).json(rows[0]);
 }));
 
 app.delete("/api/expenses/:id", requireAuth, wrap(async (req, res) => {
