@@ -164,7 +164,6 @@
       margin-bottom: 6px;
     }
     .card .amount { font-size: 1.3rem; font-weight: 700; line-height: 1.4; }
-    .card .amount .currency-line { display: block; }
     .card.total .amount  { color: #e63946; }
     .card.count .amount  { font-size: 1.5rem; color: #2a9d8f; }
     .card.gran  .amount  { font-size: 1rem; color: #457b9d; font-weight: 600; }
@@ -248,7 +247,7 @@
           <input type="date" id="dateTo" />
         </div>
         <div>
-          <label for="filterCurrency">Currency</label>
+          <label for="filterCurrency">Original Currency</label>
           <select id="filterCurrency">
             <option value="">All Currencies</option>
             <option value="RSD">RSD</option>
@@ -466,29 +465,25 @@
     let categoryChart = null;
 
     function renderCharts(expenses, fromStr, toStr, currency) {
-      const filtered = expenses.filter(e => {
-        if (e.date < fromStr || e.date > toStr) return false;
-        if (currency && e.currency !== currency) return false;
-        return true;
-      });
+      // All amounts are shown in EUR, converted at the current exchange rate
+      const filtered = expenses
+        .filter(e => {
+          if (e.date < fromStr || e.date > toStr) return false;
+          if (currency && e.currency !== currency) return false;
+          return true;
+        })
+        .map(e => ({ ...e, amount: parseFloat(e.amount) / rates[e.currency], currency: "EUR" }));
 
       // Summary
-      const totals = {};
-      filtered.forEach(e => { totals[e.currency] = (totals[e.currency] || 0) + parseFloat(e.amount); });
-      const totalKeys = Object.keys(totals);
-      document.getElementById("summaryTotal").innerHTML =
-        totalKeys.length === 0
-          ? "—"
-          : totalKeys.map(c => `<span class="currency-line">${formatMoney(totals[c], c)}</span>`).join("");
+      document.getElementById("summaryTotal").textContent =
+        filtered.length === 0 ? "—" : formatMoney(filtered.reduce((sum, e) => sum + e.amount, 0), "EUR");
       document.getElementById("summaryCount").textContent = filtered.length;
 
       const gran = getGranularity(fromStr, toStr);
       const granLabel = gran === "day" ? "Day" : gran === "week" ? "Week" : "Month";
       document.getElementById("summaryGran").textContent = granLabel;
 
-      const currencyLabel = currency || (totalKeys.length === 1 ? totalKeys[0] : "mixed");
-      document.getElementById("timelineTitle").textContent =
-        `Spending Over Time${currency ? " (" + currency + ")" : ""}`;
+      document.getElementById("timelineTitle").textContent = "Spending Over Time (EUR)";
 
       // Timeline
       const timeline = buildTimeline(filtered, fromStr, toStr, gran);
@@ -500,7 +495,7 @@
         data: {
           labels: timeline.labels,
           datasets: [{
-            label: currencyLabel,
+            label: "EUR",
             data: timeline.data,
             backgroundColor: "rgba(69,123,157,0.7)",
             borderColor: "#457b9d",
@@ -516,7 +511,7 @@
             y: {
               beginAtZero: true,
               ticks: {
-                callback: (v) => currency ? formatMoney(v, currency) : v.toLocaleString(),
+                callback: (v) => formatMoney(v, "EUR"),
               },
             },
             x: {
@@ -565,7 +560,7 @@
                   const val = ctx.parsed;
                   const total = ctx.dataset.data.reduce((a, b) => a + b, 0);
                   const pct = ((val / total) * 100).toFixed(1);
-                  const fmt = currency ? formatMoney(val, currency) : val.toLocaleString();
+                  const fmt = formatMoney(val, "EUR");
                   return ` ${fmt} (${pct}%)`;
                 },
               },
@@ -578,6 +573,7 @@
     // ── State & events ────────────────────────────────────────────────────────
 
     let allExpenses = [];
+    let rates = null; // units of each currency per 1 EUR
 
     function refresh() {
       const from     = document.getElementById("dateFrom").value;
@@ -604,8 +600,12 @@
         document.getElementById("userAvatar").src = user.avatar || "";
         document.getElementById("app").classList.add("visible");
 
-        const expRes = await fetch("/api/expenses");
-        if (expRes.ok) {
+        const [expRes, ratesRes] = await Promise.all([fetch("/api/expenses"), fetch("/api/rates")]);
+        if (ratesRes.ok) rates = (await ratesRes.json()).rates;
+        if (expRes.ok && !rates) {
+          document.getElementById("summaryTotal").textContent = "n/a";
+          document.getElementById("timelineTitle").textContent = "Exchange rates are currently unavailable";
+        } else if (expRes.ok) {
           allExpenses = await expRes.json();
           refresh();
         }

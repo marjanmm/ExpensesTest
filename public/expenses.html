@@ -135,10 +135,10 @@
       margin-bottom: 6px;
     }
     .card .amount { font-size: 1.3rem; font-weight: 700; line-height: 1.4; }
-    .card .amount .currency-line { display: block; }
     .card.total .amount { color: #e63946; }
     .card.month .amount { color: #457b9d; }
-    .card.count .amount { font-size: 1.5rem; color: #2a9d8f; }
+    .card.week .amount { color: #2a9d8f; }
+    .card .entries { font-size: 0.7rem; color: #999; margin-top: 2px; }
 
     /* Form */
     .form-card {
@@ -282,14 +282,15 @@
         <div class="card total">
           <div class="label">Total Spent</div>
           <div class="amount" id="totalAll">—</div>
+          <div class="entries"><span id="totalCount">0</span> entries</div>
         </div>
         <div class="card month">
           <div class="label">This Month</div>
           <div class="amount" id="totalMonth">—</div>
         </div>
-        <div class="card count">
-          <div class="label">Entries</div>
-          <div class="amount" id="totalCount">0</div>
+        <div class="card week">
+          <div class="label">This Week</div>
+          <div class="amount" id="totalWeek">—</div>
         </div>
       </div>
 
@@ -421,6 +422,29 @@
     }
 
     let expenses = [];
+    let rates = null; // units of each currency per 1 EUR
+
+    async function loadRates() {
+      try {
+        const res = await fetch("/api/rates");
+        if (res.ok) rates = (await res.json()).rates;
+      } catch {}
+    }
+
+    function toEur(e) {
+      return parseFloat(e.amount) / rates[e.currency];
+    }
+
+    // [Monday, next Monday) of the current week, as YYYY-MM-DD strings
+    function thisWeekRange() {
+      const now = new Date();
+      const monday = now.getDate() - ((now.getDay() + 6) % 7);
+      const fmt = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+      return [
+        fmt(new Date(now.getFullYear(), now.getMonth(), monday)),
+        fmt(new Date(now.getFullYear(), now.getMonth(), monday + 7)),
+      ];
+    }
 
     function render() {
       const catFilter      = document.getElementById("filterCategory").value;
@@ -438,16 +462,16 @@
       const now = new Date();
       const thisMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
 
-      function totalsHTML(list) {
-        const totals = {};
-        list.forEach(e => { totals[e.currency] = (totals[e.currency] || 0) + parseFloat(e.amount); });
-        const keys = Object.keys(totals);
-        if (keys.length === 0) return "—";
-        return keys.map(c => `<span class="currency-line">${formatMoney(totals[c], c)}</span>`).join("");
+      // Everything is converted to EUR using the current exchange rate
+      function totalEur(list) {
+        if (!rates) return "n/a";
+        return formatMoney(list.reduce((sum, e) => sum + toEur(e), 0), "EUR");
       }
 
-      document.getElementById("totalAll").innerHTML   = totalsHTML(expenses);
-      document.getElementById("totalMonth").innerHTML = totalsHTML(expenses.filter(e => e.date.startsWith(thisMonth)));
+      const [weekStart, nextWeekStart] = thisWeekRange();
+      document.getElementById("totalAll").textContent   = totalEur(expenses);
+      document.getElementById("totalMonth").textContent = totalEur(expenses.filter(e => e.date.startsWith(thisMonth)));
+      document.getElementById("totalWeek").textContent  = totalEur(expenses.filter(e => e.date >= weekStart && e.date < nextWeekStart));
       document.getElementById("totalCount").textContent = expenses.length;
 
       // List
@@ -538,7 +562,8 @@
         document.getElementById("userName").textContent = user.name;
         document.getElementById("userAvatar").src = user.avatar || "";
         document.getElementById("app").classList.add("visible");
-        await loadExpenses();
+        await Promise.all([loadExpenses(), loadRates()]);
+        render();
       } else {
         document.getElementById("loginScreen").classList.add("visible");
       }
