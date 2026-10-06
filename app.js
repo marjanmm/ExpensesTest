@@ -172,6 +172,47 @@ function validateExpense(body) {
   return { value: { amount: amt, currency, date, category, description } };
 }
 
+// ── Exchange rates ──────────────────────────────────────────────────────────
+
+// Rates (EUR base) come from open.er-api.com, which covers all supported currencies including RSD.
+// They are cached in memory; if a refresh fails, the stale cache keeps being served.
+const RATES_URL = process.env.RATES_URL || "https://open.er-api.com/v6/latest/EUR";
+const RATES_TTL_MS = 12 * 60 * 60 * 1000;
+let ratesCache = null; // { rates, updatedAt, fetchedAt }
+let ratesInflight = null;
+
+async function fetchRates() {
+  const res = await fetch(RATES_URL, { signal: AbortSignal.timeout(8000) });
+  if (!res.ok) throw new Error(`rates API responded ${res.status}`);
+  const data = await res.json();
+  const rates = { EUR: 1 };
+  for (const c of CURRENCIES) {
+    const r = data?.rates?.[c];
+    if (c !== "EUR") {
+      if (typeof r !== "number" || !(r > 0)) throw new Error(`rates API response is missing ${c}`);
+      rates[c] = r;
+    }
+  }
+  return {
+    rates,
+    updatedAt: data.time_last_update_utc ? new Date(data.time_last_update_utc).toISOString() : null,
+    fetchedAt: Date.now(),
+  };
+}
+
+async function getRates() {
+  if (ratesCache && Date.now() - ratesCache.fetchedAt < RATES_TTL_MS) return ratesCache;
+  ratesInflight ??= fetchRates()
+    .then(r => (ratesCache = r))
+    .catch(err => {
+      console.error("Exchange rate refresh failed:", err.message);
+      if (!ratesCache) throw err;
+      return ratesCache;
+    })
+    .finally(() => { ratesInflight = null; });
+  return ratesInflight;
+}
+
 // Initialize database tables
 async function init() {
   await pool.query(`
@@ -272,6 +313,16 @@ app.delete("/api/expenses", requireAuth, wrap(async (req, res) => {
   res.status(204).end();
 }));
 
+// Units of each currency per 1 EUR: eur = amount / rates[currency]
+app.get("/api/rates", requireAuth, wrap(async (req, res) => {
+  try {
+    const { rates, updatedAt } = await getRates();
+    res.json({ base: "EUR", rates, updatedAt });
+  } catch {
+    res.status(503).json({ error: "Exchange rates are currently unavailable." });
+  }
+}));
+
 app.use("/api", (req, res) => res.status(404).json({ error: "Not found" }));
 
 // Static files last (only public/, never the project root)
@@ -290,4 +341,4 @@ app.use((err, req, res, next) => {
   res.status(500).json({ error: "Internal server error." });
 });
 
-module.exports = { app, init, pool, sessionStore, port, BASE_URL };
+module.exports = { app, init, pool, sessionStore, port, BASE_URL, getRates };
