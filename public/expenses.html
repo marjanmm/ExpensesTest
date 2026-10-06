@@ -435,14 +435,18 @@
       return parseFloat(e.amount) / rates[e.currency];
     }
 
+    // Local-time YYYY-MM-DD (toISOString() is UTC and gives yesterday's date shortly after midnight east of UTC)
+    function toDateStr(d) {
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+    }
+
     // [Monday, next Monday) of the current week, as YYYY-MM-DD strings
     function thisWeekRange() {
       const now = new Date();
       const monday = now.getDate() - ((now.getDay() + 6) % 7);
-      const fmt = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
       return [
-        fmt(new Date(now.getFullYear(), now.getMonth(), monday)),
-        fmt(new Date(now.getFullYear(), now.getMonth(), monday + 7)),
+        toDateStr(new Date(now.getFullYear(), now.getMonth(), monday)),
+        toDateStr(new Date(now.getFullYear(), now.getMonth(), monday + 7)),
       ];
     }
 
@@ -554,7 +558,7 @@
 
     // ── Auth ──────────────────────────────────────────────────────────────────
     async function init() {
-      document.getElementById("date").value = new Date().toISOString().split("T")[0];
+      document.getElementById("date").value = toDateStr(new Date());
 
       const res = await fetch("/auth/me");
       if (res.ok) {
