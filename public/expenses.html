@@ -435,10 +435,15 @@
       return parseFloat(e.amount) / rates[e.currency];
     }
 
-    function mondayOfThisWeek() {
+    // [Monday, next Monday) of the current week, as YYYY-MM-DD strings
+    function thisWeekRange() {
       const now = new Date();
-      const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() - ((now.getDay() + 6) % 7));
-      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+      const monday = now.getDate() - ((now.getDay() + 6) % 7);
+      const fmt = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+      return [
+        fmt(new Date(now.getFullYear(), now.getMonth(), monday)),
+        fmt(new Date(now.getFullYear(), now.getMonth(), monday + 7)),
+      ];
     }
 
     function render() {
@@ -463,10 +468,10 @@
         return formatMoney(list.reduce((sum, e) => sum + toEur(e), 0), "EUR");
       }
 
-      const weekStart = mondayOfThisWeek();
+      const [weekStart, nextWeekStart] = thisWeekRange();
       document.getElementById("totalAll").textContent   = totalEur(expenses);
       document.getElementById("totalMonth").textContent = totalEur(expenses.filter(e => e.date.startsWith(thisMonth)));
-      document.getElementById("totalWeek").textContent  = totalEur(expenses.filter(e => e.date >= weekStart));
+      document.getElementById("totalWeek").textContent  = totalEur(expenses.filter(e => e.date >= weekStart && e.date < nextWeekStart));
       document.getElementById("totalCount").textContent = expenses.length;
 
       // List

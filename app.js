@@ -175,11 +175,15 @@ function validateExpense(body) {
 // ── Exchange rates ──────────────────────────────────────────────────────────
 
 // Rates (EUR base) come from open.er-api.com, which covers all supported currencies including RSD.
-// They are cached in memory; if a refresh fails, the stale cache keeps being served.
+// They are cached in memory; if a refresh fails, the stale cache keeps being served and
+// upstream is not retried until RATES_RETRY_MS has passed.
 const RATES_URL = process.env.RATES_URL || "https://open.er-api.com/v6/latest/EUR";
 const RATES_TTL_MS = 12 * 60 * 60 * 1000;
+const RATES_RETRY_MS = 5 * 60 * 1000;
 let ratesCache = null; // { rates, updatedAt, fetchedAt }
 let ratesInflight = null;
+let ratesNextRetryAt = 0;
+let ratesLastError = null;
 
 async function fetchRates() {
   const res = await fetch(RATES_URL, { signal: AbortSignal.timeout(8000) });
@@ -193,24 +197,42 @@ async function fetchRates() {
       rates[c] = r;
     }
   }
+  const updated = new Date(data.time_last_update_utc ?? NaN);
   return {
     rates,
-    updatedAt: data.time_last_update_utc ? new Date(data.time_last_update_utc).toISOString() : null,
+    updatedAt: isNaN(updated) ? null : updated.toISOString(),
     fetchedAt: Date.now(),
   };
 }
 
 async function getRates() {
   if (ratesCache && Date.now() - ratesCache.fetchedAt < RATES_TTL_MS) return ratesCache;
+  if (!ratesInflight && Date.now() < ratesNextRetryAt) {
+    if (ratesCache) return ratesCache;
+    throw ratesLastError;
+  }
   ratesInflight ??= fetchRates()
-    .then(r => (ratesCache = r))
+    .then(r => {
+      ratesNextRetryAt = 0;
+      ratesLastError = null;
+      return (ratesCache = r);
+    })
     .catch(err => {
       console.error("Exchange rate refresh failed:", err.message);
+      ratesNextRetryAt = Date.now() + RATES_RETRY_MS;
+      ratesLastError = err;
       if (!ratesCache) throw err;
       return ratesCache;
     })
     .finally(() => { ratesInflight = null; });
   return ratesInflight;
+}
+
+// Test-only: forget cached rates and any pending retry backoff.
+function resetRatesCache() {
+  ratesCache = null;
+  ratesNextRetryAt = 0;
+  ratesLastError = null;
 }
 
 // Initialize database tables
@@ -341,4 +363,4 @@ app.use((err, req, res, next) => {
   res.status(500).json({ error: "Internal server error." });
 });
 
-module.exports = { app, init, pool, sessionStore, port, BASE_URL, getRates };
+module.exports = { app, init, pool, sessionStore, port, BASE_URL, getRates, resetRatesCache };
