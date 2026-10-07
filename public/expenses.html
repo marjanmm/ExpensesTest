@@ -571,6 +571,8 @@
       if (res.ok) {
         const user = await res.json();
         document.getElementById("userName").textContent = user.name;
+        // The name is hidden on phones, so keep it reachable from Sign out
+        document.querySelector(".btn-logout").title = `Signed in as ${user.name}`;
         if (user.avatar) document.getElementById("userAvatar").src = user.avatar;
         document.getElementById("app").classList.add("visible");
         await Promise.all([loadExpenses(), loadRates()]);
