@@ -57,3 +57,28 @@ describe("reports.html category doughnut", () => {
     expect(doughnuts(charts)[0].config.data.datasets[0].borderWidth).toBe(2);
   });
 });
+
+describe("reports.html empty range", () => {
+  it("draws the doughnut again after switching away from a range with no expenses", async () => {
+    const { $, change, charts } = loadPage("reports.html", routes({ expenses: [expense()] }));
+    await vi.waitFor(() => expect(doughnuts(charts)).toHaveLength(1));
+    const from = $("#dateFrom").value;
+    const to = $("#dateTo").value;
+
+    // Setting "to" first makes the range invalid (from > to), so nothing renders in between
+    change("#dateTo", "2000-01-31");
+    change("#dateFrom", "2000-01-01");
+    expect($("#categoryEmpty").hidden).toBe(false);
+    expect($("#categoryWrap").hidden).toBe(true);
+    expect(doughnuts(charts).every((c) => c.destroyed)).toBe(true);
+
+    change("#dateFrom", from);
+    change("#dateTo", to);
+    const latest = doughnuts(charts).at(-1);
+    expect(latest.destroyed).toBe(false);
+    expect(latest.canvas).toBe($("#categoryChart"));
+    expect(latest.canvas.isConnected).toBe(true);
+    expect($("#categoryEmpty").hidden).toBe(true);
+    expect($("#categoryWrap").hidden).toBe(false);
+  });
+});

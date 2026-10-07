@@ -207,6 +207,7 @@
       color: #bbb;
       font-size: 0.9rem;
     }
+    .empty-chart[hidden] { display: none; }
   </style>
 </head>
 <body>
@@ -297,9 +298,10 @@
       <!-- Category pie chart -->
       <div class="chart-card">
         <h2>Spending by Category</h2>
-        <div class="chart-wrap pie">
+        <div class="chart-wrap pie" id="categoryWrap">
           <canvas id="categoryChart"></canvas>
         </div>
+        <div class="empty-chart" id="categoryEmpty" hidden>No expenses in this range.</div>
       </div>
 
     </div>
@@ -536,15 +538,15 @@
       const catData = buildCategoryData(filtered);
 
       if (categoryChart) categoryChart.destroy();
-      const cCtx = document.getElementById("categoryChart").getContext("2d");
+      categoryChart = null;
 
-      if (catData.data.length === 0) {
-        categoryChart = null;
-        cCtx.clearRect(0, 0, cCtx.canvas.width, cCtx.canvas.height);
-        cCtx.canvas.parentElement.innerHTML =
-          `<div class="empty-chart">No expenses in this range.</div>`;
-        return;
-      }
+      // Toggle the message instead of replacing the canvas, so a later range with expenses can draw again
+      const isEmpty = catData.data.length === 0;
+      document.getElementById("categoryWrap").hidden = isEmpty;
+      document.getElementById("categoryEmpty").hidden = !isEmpty;
+      if (isEmpty) return;
+
+      const cCtx = document.getElementById("categoryChart").getContext("2d");
 
       categoryChart = new Chart(cCtx, {
         type: "doughnut",
