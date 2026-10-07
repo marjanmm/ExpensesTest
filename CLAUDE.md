@@ -32,6 +32,7 @@ There is no build step and no linter. The app is at `http://localhost:3000/expen
 - Test files run one at a time in separate processes (shared DB, fresh in-memory rate limiter per file).
 - `test/helpers.js`'s `createUser` bypasses Google: it inserts a `test-*` user, stores a session directly and returns a signed `connect.sid` cookie. `cleanDb` deletes `test-*` users and `test-sid-*` sessions.
 - Network calls (such as the rates API) are mocked with `vi.stubGlobal("fetch", ...)`.
+- Frontend logic is tested in `test/pages.test.js`. `test/page.js`'s `loadPage` runs a page's inline script in jsdom, with `fetch` answered from a route map and Chart.js replaced by a stub that records each chart's config. jsdom does no layout or drawing, so check how things look in a browser (below).
 
 ## Checking UI changes in a browser
 

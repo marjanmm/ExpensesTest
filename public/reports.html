@@ -110,6 +110,17 @@
     }
     .btn-logout:hover { background: #f5f5f5; }
 
+    /* On phones only the title, nav and Sign out fit on one row */
+    @media (max-width: 600px) {
+      .header { padding: 10px 12px; gap: 8px; flex-wrap: wrap; } /* very narrow screens: Sign out wraps below */
+      .header-left { gap: 8px; }
+      .header h1 { font-size: 1rem; }
+      .nav a { padding: 5px 7px; }
+      .user-info { margin-left: auto; }
+      .user-info img, .user-name { display: none; }
+      .btn-logout { padding: 5px 10px; white-space: nowrap; }
+    }
+
     /* Layout */
     .container {
       max-width: 900px;
@@ -196,6 +207,7 @@
       color: #bbb;
       font-size: 0.9rem;
     }
+    .empty-chart[hidden] { display: none; }
   </style>
 </head>
 <body>
@@ -228,7 +240,7 @@
         </nav>
       </div>
       <div class="user-info">
-        <img id="userAvatar" src="" alt="" onerror="this.style.display='none'" />
+        <img id="userAvatar" alt="" hidden onload="this.hidden = false" />
         <span class="user-name" id="userName"></span>
         <form method="post" action="/auth/logout"><button type="submit" class="btn-logout">Sign out</button></form>
       </div>
@@ -286,9 +298,10 @@
       <!-- Category pie chart -->
       <div class="chart-card">
         <h2>Spending by Category</h2>
-        <div class="chart-wrap pie">
+        <div class="chart-wrap pie" id="categoryWrap">
           <canvas id="categoryChart"></canvas>
         </div>
+        <div class="empty-chart" id="categoryEmpty" hidden>No expenses in this range.</div>
       </div>
 
     </div>
@@ -525,15 +538,15 @@
       const catData = buildCategoryData(filtered);
 
       if (categoryChart) categoryChart.destroy();
-      const cCtx = document.getElementById("categoryChart").getContext("2d");
+      categoryChart = null;
 
-      if (catData.data.length === 0) {
-        categoryChart = null;
-        cCtx.clearRect(0, 0, cCtx.canvas.width, cCtx.canvas.height);
-        cCtx.canvas.parentElement.innerHTML =
-          `<div class="empty-chart">No expenses in this range.</div>`;
-        return;
-      }
+      // Toggle the message instead of replacing the canvas, so a later range with expenses can draw again
+      const isEmpty = catData.data.length === 0;
+      document.getElementById("categoryWrap").hidden = isEmpty;
+      document.getElementById("categoryEmpty").hidden = !isEmpty;
+      if (isEmpty) return;
+
+      const cCtx = document.getElementById("categoryChart").getContext("2d");
 
       categoryChart = new Chart(cCtx, {
         type: "doughnut",
@@ -542,7 +555,8 @@
           datasets: [{
             data: catData.data,
             backgroundColor: catData.colors,
-            borderWidth: 2,
+            // A single slice would show the separator as a seam at the top
+            borderWidth: catData.data.length > 1 ? 2 : 0,
             borderColor: "#fff",
           }],
         },
@@ -597,7 +611,9 @@
       if (res.ok) {
         const user = await res.json();
         document.getElementById("userName").textContent = user.name;
-        document.getElementById("userAvatar").src = user.avatar || "";
+        // The name is hidden on phones, so keep it reachable from Sign out
+        document.querySelector(".btn-logout").title = `Signed in as ${user.name}`;
+        if (user.avatar) document.getElementById("userAvatar").src = user.avatar;
         document.getElementById("app").classList.add("visible");
 
         const [expRes, ratesRes] = await Promise.all([fetch("/api/expenses"), fetch("/api/rates")]);
